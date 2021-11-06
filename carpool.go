@@ -18,9 +18,11 @@ type Carpool struct {
 type Period struct {
 	Literprice  float64              // price per liter gas in euro
 	Consumption float64              // liters per 100km
-	Distance    float64              // one way distance in km
-	Passengers  map[string]Passenger // people that took a ride in this period
 	Fixed       float64              // fixed rate per km in euro
+	Distance    float64              // one way distance in km
+	Notes       string               // if you have anything to say, do it here
+	Passengers  map[string]Passenger // people that took a ride in this period
+	Calculated  bool                 // true if period already has been calculated
 }
 
 type Passenger struct {
@@ -39,6 +41,7 @@ func main() {
 	carpool.save()
 }
 
+// calculate how much each passenger has to pay
 func (per *Period) calculate() {
 	for name, pas := range per.Passengers {
 		pas.Bill = 0
@@ -52,12 +55,25 @@ func (per *Period) calculate() {
 	}
 }
 
+// calculate all periods that still have to
 func (carpool *Carpool) calculateAll() {
+	for i, per := range carpool.Periods {
+		if !per.Calculated {
+			per.calculate()
+			per.Calculated = true
+			carpool.Periods[i] = per
+		}
+	}
+}
+
+// calculate all periods even if they already have been calculated
+func (carpool *Carpool) recalculateAll() {
 	for _, per := range carpool.Periods {
 		per.calculate()
 	}
 }
 
+// save the current working data to disk
 func (carpool *Carpool) save() {
 	file, err := os.Create(dbFile)
 	if err != nil {
@@ -72,6 +88,7 @@ func (carpool *Carpool) save() {
 
 }
 
+// load saved data from disk
 func load() (*Carpool, error) {
 	file, err := os.Open(dbFile)
 	if err != nil {
@@ -85,4 +102,22 @@ func load() (*Carpool, error) {
 	dec.Decode(&carpool)
 
 	return &carpool, nil
+}
+
+// calculate the total bill of a passenger
+// This method in its current form is likely to get deprecated.
+// The database is designed to be longterm but passengers will meanwhile already pay parts of their bill.
+func (carpool *Carpool) totalPerPassenger() {
+	carpool.calculateAll()
+
+	sum := make(map[string]float64)
+	for _, per := range carpool.Periods {
+		for name, pas := range per.Passengers {
+			sum[name] += pas.Bill
+		}
+	}
+
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "\t")
+	enc.Encode(sum)
 }
