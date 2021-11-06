@@ -20,6 +20,7 @@ type Period struct {
 	Consumption float64              // liters per 100km
 	Distance    float64              // one way distance in km
 	Passengers  map[string]Passenger // people that took a ride in this period
+	Fixed       float64              // fixed rate per km in euro
 }
 
 type Passenger struct {
@@ -44,7 +45,7 @@ func (per *Period) calculate() {
 		for _, b := range []byte(pas.Drivelog) {
 			i, err := strconv.Atoi(string(b))
 			if err == nil {
-				pas.Bill += ((per.Consumption / 100.) * per.Distance * per.Literprice) / float64(i)
+				pas.Bill += (((per.Consumption / 100.) * per.Distance * per.Literprice) + (per.Distance * per.Fixed)) / float64(i)
 			}
 		}
 		per.Passengers[name] = pas
