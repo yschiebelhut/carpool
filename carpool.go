@@ -2,8 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strconv"
+)
+
+var (
+	dbFile string = "carpool.json"
 )
 
 type Carpool struct {
@@ -23,45 +28,14 @@ type Passenger struct {
 }
 
 func main() {
-	carpool := Carpool{
-		Periods: []Period{
-			{
-				Literprice:  1.319,
-				Consumption: 8,
-				Distance:    50,
-				Passengers: map[string]Passenger{
-					"Tick": {
-						Drivelog: "5534",
-					},
-					"Trick": {
-						Drivelog: "55",
-					},
-				},
-			},
-			{
-				Literprice:  1.339,
-				Consumption: 8,
-				Distance:    50,
-				Passengers: map[string]Passenger{
-					"Trick": {
-						Drivelog: "3322",
-					},
-					"Track": {
-						Drivelog: "2",
-					},
-				},
-			},
-		},
+	carpool, err := load()
+	if err != nil {
+		panic(err)
 	}
 
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "\t")
+	carpool.calculateAll()
 
-	for _, per := range carpool.Periods {
-		per.calculate()
-	}
-
-	enc.Encode(carpool)
+	carpool.save()
 }
 
 func (per *Period) calculate() {
@@ -75,4 +49,39 @@ func (per *Period) calculate() {
 		}
 		per.Passengers[name] = pas
 	}
+}
+
+func (carpool *Carpool) calculateAll() {
+	for _, per := range carpool.Periods {
+		per.calculate()
+	}
+}
+
+func (carpool *Carpool) save() {
+	file, err := os.Create(dbFile)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	defer file.Close()
+	enc := json.NewEncoder(file)
+	enc.SetIndent("", "\t")
+	enc.Encode(carpool)
+
+}
+
+func load() (*Carpool, error) {
+	file, err := os.Open(dbFile)
+	if err != nil {
+		fmt.Println(err)
+		return &Carpool{}, err
+	}
+
+	defer file.Close()
+	dec := json.NewDecoder(file)
+	carpool := Carpool{}
+	dec.Decode(&carpool)
+
+	return &carpool, nil
 }
